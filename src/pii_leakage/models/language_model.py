@@ -87,11 +87,11 @@ class LanguageModel:
 
             if is_valid_url(self.model_args.model_ckpt):
                 self.model_args.model_ckpt = download_and_unzip(self.model_args.model_ckpt)
-            self._lm = model_cls.from_pretrained(self.model_args.model_ckpt, return_dict=True).eval()
+            self._lm = model_cls.from_pretrained(self.model_args.model_ckpt, return_dict=True, device_map='auto').eval()
         elif self.model_args.pre_trained:  # if no checkpoint is provided, load a public, pre-trained model.
             if verbose:
                 print(f"> Loading a public, pre-trained {self.model_args.architecture} model.")
-            self._lm = model_cls.from_pretrained(self.model_args.architecture, return_dict=True).eval()
+            self._lm = model_cls.from_pretrained(self.model_args.architecture, return_dict=True, device_map='auto').eval()
         else:  # no checkpoint and no pre-trained model, hence randomly initialize model's parameters.
             if verbose:
                 print(f"> Loading an uninitialized {self.model_args.architecture} model.")
@@ -297,8 +297,8 @@ class LanguageModel:
 
         extra_callbacks += [PrintSampleCallback(model=self, sampling_args=SamplingArgs(),
                                                 num_steps=train_args.callback_after_n_steps)]
-        extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
-                                                       num_steps=train_args.callback_after_n_steps)]
+        # extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
+        #                                                num_steps=train_args.callback_after_n_steps)]
 
         data_collator = DataCollatorForLanguageModeling(tokenizer=self._tokenizer, mlm=False)
 

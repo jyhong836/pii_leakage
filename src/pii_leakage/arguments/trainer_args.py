@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 from dataclasses import dataclass, field
+from typing import Optional, List
 
 from transformers import IntervalStrategy, logging, TrainingArguments
 
@@ -93,6 +94,10 @@ class TrainerArgs(TrainingArguments):
         metadata={
             "help": "The split to evaluate ppl on."
         }
+    )
+
+    report_to: Optional[List[str]] = field(
+        default_factory=lambda: ['wandb'], metadata={"help": "The list of integrations to report the results and logs to. Default: wandb"}
     )
 
     def __post_init__(self):

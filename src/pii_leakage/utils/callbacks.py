@@ -21,8 +21,11 @@ class PrintSampleCallback(TrainerCallback):
 
     def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         if state.global_step % self.num_steps == 0:
-            sentence = self.model.generate(N=1, seq_len=self.sampling_args.seq_len, top_k=self.sampling_args.top_k,
-                                                batch_size=1, top_p=self.sampling_args.top_p, verbose=False)
+            # sentence = self.model.generate(N=1, seq_len=self.sampling_args.seq_len, top_k=self.sampling_args.top_k,
+            #                                     batch_size=1, top_p=self.sampling_args.top_p, verbose=False)
+            sentence = self.model.generate(SamplingArgs(N=1, seq_len=self.sampling_args.seq_len, top_k=self.sampling_args.top_k,
+                                                top_p=self.sampling_args.top_p, generate_verbose=False
+                                                ))
             print_highlighted(sentence)
 
 class EvaluateDPEpsilonCallback(TrainerCallback):
