@@ -297,8 +297,8 @@ class LanguageModel:
 
         extra_callbacks += [PrintSampleCallback(model=self, sampling_args=SamplingArgs(),
                                                 num_steps=train_args.callback_after_n_steps)]
-        # extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
-        #                                                num_steps=train_args.callback_after_n_steps)]
+        extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
+                                                       num_steps=train_args.callback_after_n_steps)]
 
         data_collator = DataCollatorForLanguageModeling(tokenizer=self._tokenizer, mlm=False)
 
