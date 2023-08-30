@@ -38,12 +38,12 @@ class Dataset:
         dataset_pii.limit(self.ner_args.tag_n_batches)
 
         # Check if there are untagged pii entities.
-        if len(self._base_dataset['text'][:self.ner_args.tag_n_batches]) > dataset_pii.last_batch_idx():
+        if len(self._base_dataset['text'][:self.ner_args.tag_n_batches]) > dataset_pii.last_batch_idx() + 1:
             tagger = TaggerFactory.from_ner_args(self.ner_args, env_args=self.env_args)
-            last_idx = dataset_pii.last_batch_idx()
+            last_idx = dataset_pii.last_batch_idx() + 1
             for idx, sequence in enumerate(
-                    tqdm(self._base_dataset['text'][dataset_pii.last_batch_idx():self.ner_args.tag_n_batches],
-                         desc="Tagging PII")):
+                    tqdm(self._base_dataset['text'][last_idx:self.ner_args.tag_n_batches],
+                         desc="Tagging Extra PII")):
 
                 pii_list: ListPII = tagger.analyze(sequence)
                 dataset_pii.add_pii(last_idx + idx, pii_list)
