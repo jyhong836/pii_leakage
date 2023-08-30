@@ -31,3 +31,8 @@ def hash_dict(d):
     sorted_dict = {k: v for k, v in sorted(d.items())}
     json_str = json.dumps(sorted_dict, default=default, sort_keys=True)
     return hashlib.md5(json_str.encode('utf-8')).hexdigest()
+
+def batchfy(iterable, batch_size=1):
+    l = len(iterable)
+    for ndx in range(0, l, batch_size):
+        yield iterable[ndx:min(ndx + batch_size, l)]

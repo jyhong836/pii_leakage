@@ -74,6 +74,7 @@ class FlairTagger(Tagger):
 
         # 2. remove all pii
         for pii in piis:
-            text[pii.start:pii.end] = self.ner_args.anon_token
+            # text[pii.start:pii.end] = self.ner_args.anon_token
+            text = text[:pii.start] + self.ner_args.anon_token + text[pii.end:]
         return text, piis
 

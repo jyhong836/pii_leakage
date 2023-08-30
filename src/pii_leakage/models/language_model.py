@@ -41,6 +41,9 @@ class GeneratedTextList:
 
     def __str__(self):
         return "\n".join([str(x) for x in self.data])
+    
+    def __len__(self):
+        return len(self.data) if self.data is not None else 0
 
 
 class LanguageModel:
@@ -100,7 +103,8 @@ class LanguageModel:
         self._tokenizer.padding_side = "right"
         self._tokenizer.pad_token = self._tokenizer.eos_token
         self._lm.config.pad_token_id = self._lm.config.eos_token_id
-        self._lm.to(self.env_args.device)
+        if not (self.model_args.model_ckpt or self.model_args.pre_trained):
+            self._lm.to(self.env_args.device)
         return self
 
     def substring_perplexity(self, seq: str, substring: str) -> float:
@@ -145,8 +149,8 @@ class LanguageModel:
 
         # Encode the input prompt
         prompts: List[str] = (
-            [" "] * r if sampling_args.prompt is None or sampling_args.prompt.strip() == ""
-            else [sampling_args.prompt] * r
+            [" "] if sampling_args.prompt is None or sampling_args.prompt.strip() == ""
+            else [sampling_args.prompt]
         )
 
         inputs = self._tokenizer(prompts, return_tensors="pt", padding=True, truncation=True)
@@ -187,10 +191,22 @@ class LanguageModel:
 
         return GeneratedTextList(data=generated_data)
 
-    def tokenize_datasets(self, datasets: List[RealDataset], column_name="text") -> List:
+    def tokenize_datasets(self, datasets: List[RealDataset], column_name="text", pre_remove_columns=False) -> List:
         """ Tokenizes the 'text' column of a list of dataset using this model's tokenizer """
         tokenize_function = lambda x: self._tokenizer(x[column_name], truncation=True)
-        return [dataset.get_hf_dataset().map(tokenize_function, batched=True) for dataset in datasets]
+
+        processed_datasets = []
+        for dataset in datasets:
+            hf_dataset = dataset.get_hf_dataset()
+            if pre_remove_columns:
+                hf_dataset = hf_dataset.remove_columns([c for c in hf_dataset.column_names if c not in [column_name]])
+            
+            hf_dataset = hf_dataset.map(tokenize_function, batched=True)
+
+            if pre_remove_columns:
+                hf_dataset = hf_dataset.remove_columns([column_name])
+            processed_datasets.append(hf_dataset)
+        return processed_datasets
 
     def perplexity(self, data: Union[list, str], offset=0, max_length=0, apply_exp=True, verbose=True,
                    return_as_list: bool = False) -> float:
@@ -242,9 +258,14 @@ class LanguageModel:
                       privacy_args: PrivacyArgs):
 
         with train_args.main_process_first(desc="Tokenizing datasets"):
-            hf_train_dataset, hf_eval_dataset = self.tokenize_datasets([train_dataset, eval_dataset])
+            eval_dataset = eval_dataset.shuffle().select(list(range(train_args.limit_eval_dataset)))
+            assert not train_args.remove_unused_columns, "DP does not support remove_unused_columns which can not work with GradSampleModule"
+            hf_train_dataset, hf_eval_dataset = self.tokenize_datasets(
+                [train_dataset, eval_dataset], 
+                pre_remove_columns=not train_args.remove_unused_columns  # if trainer does not remove (e.g., for DP), we will remove columns here (hard-coded may not apply for all)
+                )
 
-        self._lm = self._lm.to(self.env_args.device)
+        # self._lm = self._lm.to(self.env_args.device)
         self._lm.train()
 
         data_collator = dp_transformers.DataCollatorForPrivateCausalLanguageModeling(self._tokenizer)
@@ -265,7 +286,7 @@ class LanguageModel:
         )
 
         try:
-            trainer.train()
+            trainer.train(resume_from_checkpoint=train_args.resume_from_checkpoint)
         finally:
             eps_prv = trainer.get_prv_epsilon()
             eps_rdp = trainer.get_rdp_epsilon()
@@ -273,6 +294,13 @@ class LanguageModel:
                 "final_epsilon_prv": eps_prv,
                 "final_epsilon_rdp": eps_rdp
             })
+            print(f"saving model..")
+            trainer.save_model()
+            # trainer.model is a GradSampleModule.
+            trainer.model._module.save_pretrained(trainer.args.output_dir)
+            trainer.model._module.config.save_pretrained(trainer.args.output_dir)
+            trainer.model._module.generation_config.save_pretrained(trainer.args.output_dir)
+        self._lm.eval()
 
     def fine_tune(self,
                   train_dataset,

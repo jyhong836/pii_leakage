@@ -34,3 +34,7 @@ class EnvArgs:
     verbose: bool = field(default=True, metadata={
         "help": "whether to print out to the cmd line"
     })
+
+    skip_ppl_eval: bool = field(default=False, metadata={
+        "help": "whether to skip ppl eval"
+    })

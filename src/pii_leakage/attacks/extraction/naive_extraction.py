@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+from tqdm import tqdm
 from ...arguments.ner_args import NERArgs
 from ...arguments.sampling_args import SamplingArgs
 from ..privacy_attack import ExtractionAttack
@@ -8,6 +9,7 @@ from ...models.language_model import LanguageModel, GeneratedTextList
 from ...ner.tagger import Tagger
 from ...ner.tagger_factory import TaggerFactory
 from ...utils.output import print_highlighted
+from ...utils.python_helper import batchfy
 
 
 class NaiveExtractionAttack(ExtractionAttack):
@@ -33,15 +35,17 @@ class NaiveExtractionAttack(ExtractionAttack):
         # Generating text using the language model.
         generated_text: GeneratedTextList = lm.generate(sampling_args)
 
-        # Analyzing the generated text with the tagger to extract entities.
-        tagger: Tagger = self._get_tagger()
-        entities = tagger.analyze(str(generated_text))
+        pii_mentions = []
+        for batch_text in tqdm(batchfy(generated_text, self.env_args.eval_batch_size), desc='attack'):
+            # Analyzing the generated text with the tagger to extract entities.
+            tagger: Tagger = self._get_tagger()
+            entities = tagger.analyze(str(batch_text))
 
-        # Filter out the entities that are classified as persons.
-        pii = entities.get_by_entity_class(self.attack_args.pii_class)
+            # Filter out the entities that are classified as persons.
+            pii = entities.get_by_entity_class(self.attack_args.pii_class)
 
-        # Extracting the text of the person entities.
-        pii_mentions = [p.text for p in pii]
+            # Extracting the text of the person entities.
+            pii_mentions.extend([p.text for p in pii])
 
         # Counting the occurrence of each person's mention.
         result = {p: pii_mentions.count(p) for p in set(pii_mentions)}

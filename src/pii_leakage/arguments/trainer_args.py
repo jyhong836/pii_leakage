@@ -100,6 +100,17 @@ class TrainerArgs(TrainingArguments):
         default_factory=lambda: ['wandb'], metadata={"help": "The list of integrations to report the results and logs to. Default: wandb"}
     )
 
+    
+    save_total_limit: Optional[int] = field(
+        default=2,
+        metadata={
+            "help": (
+                "Limit the total amount of checkpoints. "
+                "Deletes the older checkpoints in the output_dir. Default is unlimited checkpoints"
+            )
+        },
+    )
+
     def __post_init__(self):
         super().__post_init__()
         if self.dry_run:
