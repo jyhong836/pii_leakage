@@ -65,7 +65,10 @@ class LanguageModel:
     @property
     def n_positions(self):
         """ Gets the maximum size of the context """
-        return self._lm.config.n_positions
+        if hasattr(self._lm.config, 'n_positions'):
+            return self._lm.config.n_positions
+        else:
+            return 1e12
 
     @abstractmethod
     def tokenizer(self):
