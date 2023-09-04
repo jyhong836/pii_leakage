@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from transformers import DataCollatorForLanguageModeling, Trainer, AutoTokenizer, AutoModelForCausalLM, \
-    TrainerCallback
+    TrainerCallback, LlamaForCausalLM
 
 from ..arguments.env_args import EnvArgs
 from ..arguments.model_args import ModelArgs
@@ -350,8 +350,8 @@ class LanguageModel:
         if extra_callbacks is None:
             extra_callbacks = []
 
-        extra_callbacks += [PrintSampleCallback(model=self, sampling_args=SamplingArgs(),
-                                                num_steps=train_args.callback_after_n_steps)]
+        # extra_callbacks += [PrintSampleCallback(model=self, sampling_args=SamplingArgs(),
+        #                                         num_steps=train_args.callback_after_n_steps)]
         # extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
         #                                                num_steps=train_args.callback_after_n_steps)]
 
