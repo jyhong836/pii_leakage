@@ -100,7 +100,31 @@ class LanguageModel:
                 print(f"> Loading an uninitialized {self.model_args.architecture} model.")
             self._lm = model_cls(config=self.get_config())
 
+        if self.model_args.peft != 'none':
+            # need to change for different models
+            lora_target_modules = [
+                "q_proj",
+                "v_proj",
+            ]
+            if self.model_args.peft == 'none':
+                peft_config = None
+            elif self.model_args.peft == 'lora':
+                from peft import LoraConfig, PromptTuningConfig, PeftModel
+                peft_config = LoraConfig(
+                    lora_alpha=self.model_args.lora_alpha,
+                    lora_dropout=self.model_args.lora_dropout,
+                    r=self.model_args.lora_r,
+                    bias="none",
+                    task_type="CAUSAL_LM",
+                    target_modules=lora_target_modules
+                )
+            if peft_config is not None:
+                from peft import get_peft_model
+                self._lm = get_peft_model(self._lm, peft_config)
+                self._lm.print_trainable_parameters()
+
         self._tokenizer.padding_side = "right"
+        # if self._tokenizer.pad_token is None:
         self._tokenizer.pad_token = self._tokenizer.eos_token
         self._lm.config.pad_token_id = self._lm.config.eos_token_id
         if not (self.model_args.model_ckpt or self.model_args.pre_trained):
@@ -325,8 +349,8 @@ class LanguageModel:
 
         extra_callbacks += [PrintSampleCallback(model=self, sampling_args=SamplingArgs(),
                                                 num_steps=train_args.callback_after_n_steps)]
-        extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
-                                                       num_steps=train_args.callback_after_n_steps)]
+        # extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
+        #                                                num_steps=train_args.callback_after_n_steps)]
 
         data_collator = DataCollatorForLanguageModeling(tokenizer=self._tokenizer, mlm=False)
 

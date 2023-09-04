@@ -16,7 +16,8 @@ class ModelArgs:
 
     architecture: str = field(default="gpt2", metadata={
         "help": "the architecture of the model",
-        "choices": ["gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"]
+        "choices": ["gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl",
+                    "llama2-7b"]
     })
 
     pre_trained: bool = field(default=True, metadata={
@@ -29,11 +30,35 @@ class ModelArgs:
         "help": "whether to set the flag use_fast in the tokenizer loading function."
     })
 
+    peft: str = field(default="none", metadata={
+        "help": "peft strategy",
+        "choices": ["none", "lora"]
+    })
+
+    lora_r: int = field(default=4, metadata={
+        "help": "lora dim",
+    })
+
+    lora_alpha: int = field(default=32, metadata={
+        "help": "lora scaling",
+    })
+
+    lora_dropout: int = field(default=0., metadata={
+        "help": "dropout rate",
+    })
+
     def hash(self, suffix=""):
         """ Compute a unique hash based on this dict"""
-        return hashlib.sha256(repr({
+        rep_dict = {
             "checkpoint": self.model_ckpt,
             "pre_trained": self.pre_trained,
             "suffix": suffix
-        }).encode('utf-8')).hexdigest()
+        }
+        if self.peft != 'none':
+            rep_dict['peft'] = self.peft
+            if self.peft == 'lora':
+                rep_dict['lora_r'] = self.lora_r
+                rep_dict['lora_alpha'] = self.lora_alpha
+                rep_dict['lora_dropout'] = self.lora_dropout
+        return hashlib.sha256(repr(rep_dict).encode('utf-8')).hexdigest()
 

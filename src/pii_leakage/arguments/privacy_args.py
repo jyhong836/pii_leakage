@@ -27,17 +27,17 @@ class PrivacyArgs:
         "help": "The maximum grad norm for clipping DP."
     })
 
-    lora_dim: int = field(default=0, metadata={
-        "help": "LoRA dimension; 0 means LoRA is disabled"
-    })
+    # lora_dim: int = field(default=0, metadata={
+    #     "help": "LoRA dimension; 0 means LoRA is disabled"
+    # })
 
-    lora_dropout: float = field(default=0.0, metadata={
-        "help": "Dropout probability for LoRA layers"
-    })
+    # lora_dropout: float = field(default=0.0, metadata={
+    #     "help": "Dropout probability for LoRA layers"
+    # })
 
-    lora_alpha: int = field(default=32, metadata={
-        "help": "LoRA attention alpha"
-    })
+    # lora_alpha: int = field(default=32, metadata={
+    #     "help": "LoRA attention alpha"
+    # })
 
     no_accountant: bool = field(default=False, metadata={
         "help": "Do not use a privacy accountant."
