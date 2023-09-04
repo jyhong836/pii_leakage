@@ -217,7 +217,7 @@ class LanguageModel:
 
     def tokenize_datasets(self, datasets: List[RealDataset], column_name="text", pre_remove_columns=False) -> List:
         """ Tokenizes the 'text' column of a list of dataset using this model's tokenizer """
-        tokenize_function = lambda x: self._tokenizer(x[column_name], truncation=True, max_length=512)
+        tokenize_function = lambda x: self._tokenizer(x[column_name], truncation=True, max_length=1024)
 
         processed_datasets = []
         for dataset in datasets:
