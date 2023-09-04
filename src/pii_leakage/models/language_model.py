@@ -362,7 +362,6 @@ class LanguageModel:
         train_dataset, eval_dataset = self.tokenize_datasets([train_dataset, eval_dataset])
         print("Done Tokenizing!")
 
-        train_args.evaluation_strategy = "no"
         trainer = Trainer(model=self._lm,
                           args=train_args,
                           train_dataset=train_dataset,
