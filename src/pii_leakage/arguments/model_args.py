@@ -30,6 +30,10 @@ class ModelArgs:
         "help": "whether to set the flag use_fast in the tokenizer loading function."
     })
 
+    tokenizer_max_length: int = field(default=1024, metadata={
+        "help": "Limit the max token length."
+    })
+
     peft: str = field(default="none", metadata={
         "help": "peft strategy",
         "choices": ["none", "lora"]
@@ -52,7 +56,8 @@ class ModelArgs:
         rep_dict = {
             "checkpoint": self.model_ckpt,
             "pre_trained": self.pre_trained,
-            "suffix": suffix
+            "tokenizer_max_length": self.tokenizer_max_length,
+            "suffix": suffix,
         }
         if self.peft != 'none':
             rep_dict['peft'] = self.peft

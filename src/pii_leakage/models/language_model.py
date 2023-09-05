@@ -220,7 +220,7 @@ class LanguageModel:
 
     def tokenize_datasets(self, datasets: List[RealDataset], column_name="text", pre_remove_columns=False) -> List:
         """ Tokenizes the 'text' column of a list of dataset using this model's tokenizer """
-        tokenize_function = lambda x: self._tokenizer(x[column_name], truncation=True, max_length=1024)
+        tokenize_function = lambda x: self._tokenizer(x[column_name], truncation=True, max_length=self.model_args.tokenizer_max_length)
 
         processed_datasets = []
         for dataset in datasets:
@@ -231,7 +231,8 @@ class LanguageModel:
             hf_dataset = hf_dataset.map(tokenize_function, batched=True)
 
             if pre_remove_columns:
-                hf_dataset = hf_dataset.remove_columns([column_name])
+                # FIXME token_type_ids may be needed somewhere.
+                hf_dataset = hf_dataset.remove_columns([column_name, 'token_type_ids'])
             processed_datasets.append(hf_dataset)
         return processed_datasets
 
