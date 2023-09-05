@@ -287,10 +287,12 @@ class LanguageModel:
         with train_args.main_process_first(desc="Tokenizing datasets"):
             eval_dataset = eval_dataset.shuffle().select(list(range(train_args.limit_eval_dataset)))
             assert not train_args.remove_unused_columns, "DP does not support remove_unused_columns which can not work with GradSampleModule"
+            print("Tokenizing Train and Eval Datasets ..")
             hf_train_dataset, hf_eval_dataset = self.tokenize_datasets(
                 [train_dataset, eval_dataset], 
                 pre_remove_columns=not train_args.remove_unused_columns  # if trainer does not remove (e.g., for DP), we will remove columns here (hard-coded may not apply for all)
                 )
+            print('done')
 
         # self._lm = self._lm.to(self.env_args.device)
         self._lm.train()
