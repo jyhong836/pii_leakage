@@ -375,5 +375,9 @@ class LanguageModel:
         try:
             trainer.train(resume_from_checkpoint=train_args.resume_from_checkpoint)
         finally:
+            print(f"saving to {trainer.args.output_dir}")
             trainer.save_model()
+            trainer.model.save_pretrained(trainer.args.output_dir)
+            trainer.model.config.save_pretrained(trainer.args.output_dir)
+            trainer.model.generation_config.save_pretrained(trainer.args.output_dir)
         self._lm.eval()
