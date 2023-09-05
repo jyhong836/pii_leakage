@@ -93,7 +93,16 @@ class LanguageModel:
 
             if is_valid_url(self.model_args.model_ckpt):
                 self.model_args.model_ckpt = download_and_unzip(self.model_args.model_ckpt)
-            self._lm = model_cls.from_pretrained(self.model_args.model_ckpt, return_dict=True, device_map='auto').eval()
+            if self.model_args.peft == 'none':
+                self._lm = model_cls.from_pretrained(self.model_args.model_ckpt, return_dict=True, device_map='auto')
+            elif self.model_args.peft == 'lora':
+                from peft.peft_model import PeftModel
+                self._lm = model_cls.from_pretrained(self.model_args.architecture, return_dict=True, device_map='auto')
+                self._lm = PeftModel.from_pretrained(
+                    self._lm, self.model_args.model_ckpt, return_dict=True, device_map='auto')
+            else:
+                raise NotImplementedError(f"peft mode: {self.model_args.peft}")
+            self._lm.eval()
         elif self.model_args.pre_trained:  # if no checkpoint is provided, load a public, pre-trained model.
             if verbose:
                 print(f"> Loading a public, pre-trained {self.model_args.architecture} model.")
