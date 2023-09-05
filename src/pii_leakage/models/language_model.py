@@ -372,6 +372,8 @@ class LanguageModel:
                           data_collator=data_collator,
                           callbacks=extra_callbacks)
 
-        trainer.train(resume_from_checkpoint=train_args.resume_from_checkpoint)
-        trainer.save_model()
+        try:
+            trainer.train(resume_from_checkpoint=train_args.resume_from_checkpoint)
+        finally:
+            trainer.save_model()
         self._lm.eval()
