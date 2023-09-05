@@ -258,7 +258,7 @@ class LanguageModel:
         nlls = []  # negative log likelihoods
         ctr = 0  # Number of tokens viewed
         for txt in tqdm(data, desc="Compute PPL", disable=not verbose):
-            input_ids = torch.tensor(self._tokenizer.encode(txt, truncation=True)).unsqueeze(0).to(self.env_args.device)
+            input_ids = torch.tensor(self._tokenizer.encode(txt, truncation=True, max_length=self.model_args.tokenizer_max_length)).unsqueeze(0).to(self.env_args.device)
             target_ids = input_ids.clone()
 
             if offset > 0:  # ignore everything up to the offset
