@@ -85,6 +85,7 @@ class LanguageModel:
         model_cls, tokenizer = AutoModelForCausalLM, AutoTokenizer
         self._tokenizer = tokenizer.from_pretrained(self.model_args.architecture,
                                                     use_fast=self.model_args.tokenizer_use_fast)
+        loaded_peft_model = False
 
         if self.model_args.model_ckpt:  # always load the checkpoint if provided.
             if verbose:
@@ -98,8 +99,10 @@ class LanguageModel:
             elif self.model_args.peft == 'lora':
                 from peft.peft_model import PeftModel
                 self._lm = model_cls.from_pretrained(self.model_args.architecture, return_dict=True, device_map='auto')
+                print(f"Load peft model: lora..")
                 self._lm = PeftModel.from_pretrained(
                     self._lm, self.model_args.model_ckpt, return_dict=True, device_map='auto')
+                loaded_peft_model = True
             else:
                 raise NotImplementedError(f"peft mode: {self.model_args.peft}")
             self._lm.eval()
@@ -112,15 +115,13 @@ class LanguageModel:
                 print(f"> Loading an uninitialized {self.model_args.architecture} model.")
             self._lm = model_cls(config=self.get_config())
 
-        if self.model_args.peft != 'none':
+        if self.model_args.peft != 'none' and not loaded_peft_model:
             # need to change for different models
             lora_target_modules = [
                 "q_proj",
                 "v_proj",
             ]
-            if self.model_args.peft == 'none':
-                peft_config = None
-            elif self.model_args.peft == 'lora':
+            if self.model_args.peft == 'lora':
                 from peft import LoraConfig, PromptTuningConfig, PeftModel
                 peft_config = LoraConfig(
                     lora_alpha=self.model_args.lora_alpha,
