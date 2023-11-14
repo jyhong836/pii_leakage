@@ -8,12 +8,20 @@ import pandas as pd
 from datasets import load_dataset, concatenate_datasets
 
 from pii_leakage.arguments.ner_args import NERArgs
-from pii_leakage.extern.CustomBuilder import CustomECHRBuilder
 from pii_leakage.ner.pii_results import ListPII
 from pii_leakage.ner.tagger import Tagger
 from pii_leakage.ner.tagger_factory import TaggerFactory
 from pii_leakage.utils.output import print_highlighted, print_dict_highlighted
 from pii_leakage.utils.random import rnd_idx
+
+from dataclasses import dataclass
+
+@dataclass
+class CustomECHRBuilder(datasets.BuilderConfig):
+    name: str = None
+    sample_duplication_rate: int = 1    # number of times a sample is repeated
+    shuffle_facts_seed: int = 42
+    pseudonymize: bool = True
 
 
 class CustomECHR(datasets.GeneratorBasedBuilder):
@@ -46,9 +54,11 @@ class CustomECHR(datasets.GeneratorBasedBuilder):
         super().__init__(*args, **kwargs)
 
     def _info(self):
-        features = datasets.Features({self._TEXT: datasets.Value("string"),
-                                      **{entity_class: datasets.Value("string") for entity_class
-                                         in self._tagger.get_entity_classes()}})
+        fea_dict = {self._TEXT: datasets.Value("string"),}
+        if self.config.pseudonymize:
+            fea_dict.update({entity_class: datasets.Value("string") 
+               for entity_class in self._tagger.get_entity_classes()})
+        features = datasets.Features(fea_dict)
         return datasets.DatasetInfo(
             description=self._DESCRIPTION,
             features=features
@@ -99,17 +109,24 @@ class CustomECHR(datasets.GeneratorBasedBuilder):
 
         unique_identifier = start_pos
         for i, text in enumerate(self.data[start_pos:end_pos]):
-            result: Tuple[str, ListPII] = self._tagger.pseudonymize(text)
-            pseudonymized_text, piis = result
+            if self.config.pseudonymize:
+                pseudonymized_text, piis = self._tagger.pseudonymize(text)
+                # total_piis += len(piis)
+                # if i% 100 == 0:
+                #     print(f"Found {total_piis} piis")
 
-            if i == 0:
-                print_highlighted(pseudonymized_text)
+                if i == 0:
+                    print_highlighted(pseudonymized_text)
 
-            pii_annotations = {k: ListPII() for k in self._tagger.get_entity_classes()}
-            pii_annotations.update({k: v.dumps() for k, v in piis.group_by_class().items()})
+                pii_annotations = {k: ListPII() for k in self._tagger.get_entity_classes()}
+                pii_annotations.update({k: v.dumps() for k, v in piis.group_by_class().items()})
+            else:
+                pseudonymized_text = text
+                pii_annotations = {}
+            
             for _ in range(self.config.sample_duplication_rate):
-                unique_identifier += 1
                 yield f"{unique_identifier}", {
                     self._TEXT: pseudonymized_text,
                     **pii_annotations
                 }
+                unique_identifier += 1

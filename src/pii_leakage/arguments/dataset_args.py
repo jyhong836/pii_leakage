@@ -33,6 +33,10 @@ class DatasetArgs:
     limit_dataset_size: int = field(default=1_000_000, metadata={
         "help": "Limit the number of samples to load for this dataset"
     })
+    
+    pseudonymize: bool = field(default=True, metadata={
+        "help": "Whether to process PIIs. Disable this to save time."
+    })
 
     def cache_dir(self) -> str:
         return f"/tmp/{random.randint(0, 99**10)}" if self.dataset_mode == "mixed" else None
@@ -51,7 +55,7 @@ class DatasetArgs:
     def hash(self, suffix="") -> str:
         """ Computes a persistent hash of the dataset (i) path, (ii) mode and (iii) split and (iv) the sample
         duplication rate. """
-        return hashlib.sha1(f'{self.dataset_path}_{self.dataset_mode}{self.split}{self.sample_duplication_rate}{suffix}'.encode('utf-8')).hexdigest()
+        return hashlib.sha1(f'{self.dataset_path}_{self.dataset_mode}{self.split}{self.sample_duplication_rate}_{self.pseudonymize}_{suffix}'.encode('utf-8')).hexdigest()
 
     def __iter__(self):
         return iter((self.dataset_path, self.dataset_mode))

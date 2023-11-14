@@ -28,7 +28,8 @@ class RealDataset(Dataset):
         """ Loads the huggingface dataset. """
         return load_dataset(self.dataset_args.dataset_path, cache_dir=self.dataset_args.cache_dir(),
                             name=self.dataset_args.dataset_mode if not force_undefended else "undefended",
-                            sample_duplication_rate=self.dataset_args.sample_duplication_rate)[self.dataset_args.split]
+                            sample_duplication_rate=self.dataset_args.sample_duplication_rate,
+                            pseudonymize=self.dataset_args.pseudonymize)[self.dataset_args.split]
 
     @property
     def _pii_cache(self):
