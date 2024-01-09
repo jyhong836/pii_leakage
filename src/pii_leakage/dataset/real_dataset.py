@@ -22,7 +22,7 @@ class RealDataset(Dataset):
         """
         self.dataset_args = dataset_args
         super().__init__(ner_args, env_args)
-        self._tokenized_base_dataset = self._load_base_dataset()  # this is the reference to the huggingface dataset
+        # self._tokenized_base_dataset = self._load_base_dataset()  # this is the reference to the huggingface dataset
 
     def _load_base_dataset(self, force_undefended=False):
         """ Loads the huggingface dataset. """
@@ -45,7 +45,8 @@ class RealDataset(Dataset):
 
     def select(self, indices):
         clone = self.copy()
-        clone._tokenized_base_dataset = clone._tokenized_base_dataset.select(indices)
+        # clone._tokenized_base_dataset = clone._tokenized_base_dataset.select(indices)
+        clone._base_dataset = clone._base_dataset.select(indices)
         return clone
 
     def __iter__(self):
