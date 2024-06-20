@@ -11,6 +11,7 @@ import torch
 from tqdm import tqdm
 from transformers import DataCollatorForLanguageModeling, Trainer, AutoTokenizer, AutoModelForCausalLM, \
     TrainerCallback, LlamaForCausalLM
+from transformers.optimization import get_linear_schedule_with_warmup
 
 from ..arguments.env_args import EnvArgs
 from ..arguments.model_args import ModelArgs
@@ -109,7 +110,8 @@ class LanguageModel:
         elif self.model_args.pre_trained:  # if no checkpoint is provided, load a public, pre-trained model.
             if verbose:
                 print(f"> Loading a public, pre-trained {self.model_args.architecture} model.")
-            self._lm = model_cls.from_pretrained(self.model_args.architecture, return_dict=True, device_map='auto').eval()
+            self._lm = model_cls.from_pretrained(
+                self.model_args.architecture, return_dict=True, device_map='auto').eval()
         else:  # no checkpoint and no pre-trained model, hence randomly initialize model's parameters.
             if verbose:
                 print(f"> Loading an uninitialized {self.model_args.architecture} model.")
@@ -350,8 +352,119 @@ class LanguageModel:
         """ Fine-Tune the LM with/without DP
         """
         if privacy_args.target_epsilon > 0:
-            return self._fine_tune_dp(train_dataset, eval_dataset, train_args, privacy_args)
+            # return self._fine_tune_dp(train_dataset, eval_dataset, train_args, privacy_args)
+            return self._fine_tune_fast_dp(train_dataset, eval_dataset, train_args, privacy_args)
         return self._fine_tune(train_dataset, eval_dataset, train_args)
+
+    def _fine_tune_fast_dp(self,
+                   train_dataset,
+                   eval_dataset,
+                   train_args: TrainerArgs,
+                   privacy_args: PrivacyArgs,
+                   extra_callbacks: List[TrainerCallback] = None):
+        """ Fine-Tune the model and save checkpoints to output directory
+        """
+        if extra_callbacks is None:
+            extra_callbacks = []
+
+        # extra_callbacks += [PrintSampleCallback(model=self, sampling_args=SamplingArgs(),
+        #                                         num_steps=train_args.callback_after_n_steps)]
+        # extra_callbacks += [EvaluatePerplexityCallback(dataset=eval_dataset, model=self, prefix="Eval PPL",
+        #                                                num_steps=train_args.callback_after_n_steps)]
+
+        data_collator = DataCollatorForLanguageModeling(tokenizer=self._tokenizer, mlm=False)
+
+        print("Tokenizing Train and Eval Datasets ..")
+        eval_dataset = eval_dataset.shuffle().select(list(range(train_args.limit_eval_dataset)))
+        train_dataset, eval_dataset = self.tokenize_datasets([train_dataset, eval_dataset])
+        print("Done Tokenizing!")
+
+        trainer = Trainer(model=self._lm,
+                          args=train_args,
+                          train_dataset=train_dataset,
+                          eval_dataset=eval_dataset,
+                          data_collator=data_collator,
+                          callbacks=extra_callbacks)
+        
+        
+        
+        params = tuple(param for param in self._lm.parameters() if param.requires_grad)
+        names = tuple(name for name, param in self._lm.named_parameters() if param.requires_grad)
+        num_trainable_params = sum(param.numel() for param in params)
+        print(f"Number of trainable params: {num_trainable_params / 1e6:.4f} million")
+        print(f'Number of total params: {sum(param.numel() for param in self._lm.parameters()) / 1e6:.3f} million')
+
+        # print(json.dumps(names, indent=4))
+
+        # TODO: Using a single gigantic parameter group is okay only when `weight_decay` is 0.
+        #   Biases and LM parameters should not be decayed perhaps even with privacy.
+        optimizer = torch.optim.AdamW(
+            params=params,
+            lr=train_args.learning_rate,
+            betas=(train_args.adam_beta1, train_args.adam_beta2),
+            eps=train_args.adam_epsilon,
+        )
+        trainer.optimizer = optimizer
+
+        # Create the lr_scheduler.
+        try:
+            num_GPUs=torch.distributed.get_world_size()
+        except:
+            num_GPUs=1
+            
+        if train_args.logical_batch_size!=None:
+            trainer.args.gradient_accumulation_steps=train_args.logical_batch_size/train_args.per_device_train_batch_size/num_GPUs
+        else:
+            train_args.logical_batch_size=trainer.args.gradient_accumulation_steps*train_args.per_device_train_batch_size*num_GPUs
+
+        num_update_steps_per_epoch = len(trainer.get_train_dataloader()) // trainer.args.gradient_accumulation_steps
+        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+        t_total = int(num_update_steps_per_epoch * trainer.args.num_train_epochs)
+        if train_args.lr_decay:
+            trainer.lr_scheduler = get_linear_schedule_with_warmup(
+                trainer.optimizer,
+                num_warmup_steps=train_args.warmup_steps,
+                num_training_steps=t_total,
+            )
+        else:
+            trainer.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(trainer.optimizer, lambda _: 1.)
+        
+        from fastDP import PrivacyEngine
+        privacy_engine = PrivacyEngine(
+            module=self._lm,
+            batch_size=train_args.logical_batch_size,
+            sample_size=len(train_dataset),
+            epochs=train_args.num_train_epochs,
+            max_grad_norm=privacy_args.per_example_max_grad_norm,
+            noise_multiplier=privacy_args.noise_multiplier,
+            target_epsilon=privacy_args.target_epsilon,
+            target_delta=privacy_args.target_delta,
+            accounting_mode=privacy_args.accounting_mode,
+            clipping_mode=privacy_args.clipping_mode,
+            clipping_fn=privacy_args.clipping_fn,
+            clipping_style=privacy_args.clipping_style,
+            origin_params=['wte','wpe'],
+            num_GPUs=1,
+            torch_seed_is_fixed=True,
+        )
+        
+        # Originally, these could have been null.
+        privacy_args.noise_multiplier = privacy_engine.noise_multiplier
+        privacy_args.target_delta = privacy_engine.target_delta
+        
+        # print('privacy_args: ')
+        # print(json.dumps(privacy_args.__dict__, indent=4))
+        privacy_engine.attach(optimizer)
+
+        try:
+            trainer.train(resume_from_checkpoint=train_args.resume_from_checkpoint)
+        finally:
+            print(f"saving to {trainer.args.output_dir}")
+            trainer.save_model()
+            trainer.model.save_pretrained(trainer.args.output_dir)
+            trainer.model.config.save_pretrained(trainer.args.output_dir)
+            trainer.model.generation_config.save_pretrained(trainer.args.output_dir)
+        self._lm.eval()
 
     def _fine_tune(self,
                    train_dataset,
