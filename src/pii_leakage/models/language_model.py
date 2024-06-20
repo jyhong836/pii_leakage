@@ -412,37 +412,37 @@ class LanguageModel:
         except:
             num_GPUs=1
             
-        if train_args.logical_batch_size!=None:
-            trainer.args.gradient_accumulation_steps=train_args.logical_batch_size/train_args.per_device_train_batch_size/num_GPUs
-        else:
-            train_args.logical_batch_size=trainer.args.gradient_accumulation_steps*train_args.per_device_train_batch_size*num_GPUs
+        #if train_args.logical_batch_size!=None:
+        #    trainer.args.gradient_accumulation_steps=train_args.logical_batch_size/train_args.per_device_train_batch_size/num_GPUs
+        #else:
+        logical_batch_size=trainer.args.gradient_accumulation_steps*train_args.per_device_train_batch_size*num_GPUs
 
         num_update_steps_per_epoch = len(trainer.get_train_dataloader()) // trainer.args.gradient_accumulation_steps
         num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
         t_total = int(num_update_steps_per_epoch * trainer.args.num_train_epochs)
-        if train_args.lr_decay:
-            trainer.lr_scheduler = get_linear_schedule_with_warmup(
-                trainer.optimizer,
-                num_warmup_steps=train_args.warmup_steps,
-                num_training_steps=t_total,
-            )
-        else:
-            trainer.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(trainer.optimizer, lambda _: 1.)
+        #if train_args.lr_decay:
+        #    trainer.lr_scheduler = get_linear_schedule_with_warmup(
+        #        trainer.optimizer,
+        #        num_warmup_steps=train_args.warmup_steps,
+        #        num_training_steps=t_total,
+        #    )
+        #else:
+        trainer.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(trainer.optimizer, lambda _: 1.)
         
         from fastDP import PrivacyEngine
         privacy_engine = PrivacyEngine(
             module=self._lm,
-            batch_size=train_args.logical_batch_size,
+            batch_size=logical_batch_size,
             sample_size=len(train_dataset),
             epochs=train_args.num_train_epochs,
-            max_grad_norm=privacy_args.per_example_max_grad_norm,
+            max_grad_norm=privacy_args.max_grad_norm_dp,
             noise_multiplier=privacy_args.noise_multiplier,
             target_epsilon=privacy_args.target_epsilon,
             target_delta=privacy_args.target_delta,
-            accounting_mode=privacy_args.accounting_mode,
-            clipping_mode=privacy_args.clipping_mode,
-            clipping_fn=privacy_args.clipping_fn,
-            clipping_style=privacy_args.clipping_style,
+            #accounting_mode=privacy_args.accounting_mode,
+            #clipping_mode=privacy_args.clipping_mode,
+            #clipping_fn=privacy_args.clipping_fn,
+            #clipping_style=privacy_args.clipping_style,
             origin_params=['wte','wpe'],
             num_GPUs=1,
             torch_seed_is_fixed=True,
