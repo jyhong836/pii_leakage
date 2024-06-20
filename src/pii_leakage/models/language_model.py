@@ -376,9 +376,10 @@ class LanguageModel:
 
         print("Tokenizing Train and Eval Datasets ..")
         eval_dataset = eval_dataset.shuffle().select(list(range(train_args.limit_eval_dataset)))
-        train_dataset, eval_dataset = self.tokenize_datasets([train_dataset, eval_dataset])
+        #train_dataset, eval_dataset = self.tokenize_datasets([train_dataset, eval_dataset])
+        train_dataset, eval_dataset = self.tokenize_datasets([train_dataset, eval_dataset], pre_remove_columns=not train_args.remove_unused_columns)
         print("Done Tokenizing!")
-
+        print("model:", self._lm)
         trainer = Trainer(model=self._lm,
                           args=train_args,
                           train_dataset=train_dataset,
@@ -443,7 +444,8 @@ class LanguageModel:
             #clipping_mode=privacy_args.clipping_mode,
             #clipping_fn=privacy_args.clipping_fn,
             #clipping_style=privacy_args.clipping_style,
-            origin_params=['wte','wpe'],
+            #origin_params=['wte','wpe'],
+            origin_params=None,
             num_GPUs=1,
             torch_seed_is_fixed=True,
         )
